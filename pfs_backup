@@ -9,7 +9,7 @@ import requests
 import ConfigParser
 from bs4 import BeautifulSoup
 
-# Suppress warnings about self-signed certs on all of our pfSense firewalls
+# Suppress warnings about self-signed certs on our pfSense firewalls
 requests.packages.urllib3.disable_warnings()
 
 
@@ -99,7 +99,7 @@ def get_backup(fwl):
 
 def parse_config():
     '''
-    Read in our configuration file, create a template if none found
+    Read in configuration file, display a sample if none found
     '''
     config = ConfigParser.SafeConfigParser()
     config_items = {}
@@ -127,7 +127,6 @@ def parse_config():
             config_items[fwname][opt] = config.get(fwname, opt)
         for opt in default_opts:
             if opts.count(opt) == 0:
-                #print "\t{}: Using defaults for {}".format(fwname, opt)
                 config_items[fwname][opt] = config.get('defaults', opt)
     return config_items
 
@@ -146,7 +145,7 @@ Here is a short sample configuration:
 #
 # For each [firewall] entry, a single 'host' option
 # is required. You only need to specify the others if
-# you want to override them for that firewall.
+# you want to override defaults for that firewall.
 #
 # You _must_ have 'username', 'password', 'skiprrd',
 # 'verify_ssl', and 'directory' in [defaults], even 
