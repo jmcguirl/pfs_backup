@@ -1,0 +1,192 @@
+#!/usr/bin/env python
+'''
+Backup all pfSense firewalls given in configuration file
+'./pfs_backup.conf'
+'''
+
+import os
+import requests
+import ConfigParser
+from bs4 import BeautifulSoup
+
+# Suppress warnings about self-signed certs on all of our pfSense firewalls
+requests.packages.urllib3.disable_warnings()
+
+
+def get_csrf_magic(content):
+    '''
+    Run through the returned content for all '<input>' elements.
+    Find the one that contains the CSRF magic data and return it.
+
+    If there is no CSRF magic, then it's a pre-2.2.6 firewall and
+    there's no CSRF protection so just return False and it'll skip
+    those bits of the script.
+    '''
+    soup = BeautifulSoup(content, 'lxml')
+    inputs = soup.find_all('input')
+    csrf = False
+    for element in inputs:
+        if element.attrs['name'] == '__csrf_magic':
+            csrf = element.attrs['value']
+            break
+    return csrf
+
+
+def get_backup(fwl):
+    '''
+    Do the actual backup, logging in and grabbing the config, then writing
+    it to the appropriate location.
+    '''
+    url = 'https://' + firewalls[fwl]['host'] + '/diag_backup.php'
+    session = requests.Session()
+
+    verify = False
+    if firewalls[fwl]['verify_ssl'].lower() == 'yes':
+        verify = True
+
+    try:
+        req = session.get(url, verify=verify)
+    except requests.exceptions.SSLError:
+        raise Exception("Certificate verification failed on {}!".format(fwl))
+    except requests.exceptions.ConnectionError:
+        print "Failed to connect: {}".format(url)
+        return "FAILED"
+    if not req.status_code == 200:
+        print "Error accessing {}: Status {}".format(url, req.status_code)
+        return "FAILED"
+    csrf = get_csrf_magic(req.content)
+
+    body = {'usernamefld': firewalls[fwl]['username'],
+            'passwordfld': firewalls[fwl]['password'],
+            'login': 'Login'}
+    if csrf:
+        body['__csrf_magic'] = csrf
+
+    req = session.post(url, data=body, verify=verify)
+    if not req.status_code == 200:
+        print "Failed to log in: {}".format(url)
+        return "FAILED"
+    csrf = get_csrf_magic(req.content)
+
+    body = {'Submit': 'download'}
+    if firewalls[fwl]['skiprrd'].lower() == 'yes':
+        body['donotbackuprrd'] = 'yes'
+    if csrf:
+        body['__csrf_magic'] = csrf
+
+    req = session.post(url, data=body, verify=verify)
+    if not req.status_code == 200:
+        print "Failed to fetch config: {}".format(url)
+        return "FAILED"
+    if 'Content-Disposition' in req.headers.keys():
+        disp = req.headers['Content-Disposition']
+        idx = disp.index('=') + 1
+        config_name = disp[idx:]
+
+    confpath = firewalls[fwl]['directory'] + '/' + config_name
+    try:
+        conf = open(confpath, 'w')
+    except IOError as err:
+        print "Failed to write configuration"
+        print "\t{}".format(err)
+        return "FAILED"
+    conf.write(req.content)
+    conf.close()
+
+    session.close()
+    return "OK"
+
+
+def parse_config():
+    '''
+    Read in our configuration file, create a template if none found
+    '''
+    config = ConfigParser.SafeConfigParser()
+    config_items = {}
+    conffile = os.path.dirname(os.environ['_']) + '/pfs_backup.conf'
+    try:
+        os.stat(conffile)
+    except OSError:
+        print "You need a configuration file at {}".format(conffile)
+        show_conf_sample()
+        return config_items
+
+    config.read(conffile)
+    if len(config.sections()) == 0:
+        print "{} is empty or incorrectly formatted.".format(conffile)
+        show_conf_sample()
+        return config_items
+
+    default_opts = config.options('defaults')
+    for fwname in config.sections():
+        if fwname == 'defaults':
+            continue
+        config_items[fwname] = {}
+        opts = config.options(fwname)
+        for opt in opts:
+            config_items[fwname][opt] = config.get(fwname, opt)
+        for opt in default_opts:
+            if opts.count(opt) == 0:
+                #print "\t{}: Using defaults for {}".format(fwname, opt)
+                config_items[fwname][opt] = config.get('defaults', opt)
+    return config_items
+
+
+def show_conf_sample():
+    '''
+    Aptly named, simply shows a sample configuration to get you started.
+    '''
+    print """
+Here is a short sample configuration:
+-------------------------------------------------------
+# Empty lines and lines starting with # are ignored.
+#
+# Options in [defaults] are used for all entries unless
+# overridden in a firewall-specific entry.
+#
+# For each [firewall] entry, a single 'host' option
+# is required. You only need to specify the others if
+# you want to override them for that firewall.
+#
+# You _must_ have 'username', 'password', 'skiprrd',
+# 'verify_ssl', and 'directory' in [defaults], even 
+# if intending to redefine them per-firewall and thus
+# no defaults are actually used.
+
+[defaults]
+username  = admin-user
+password  = your-admin-pass
+#   Location where configs are written (no trailing /).
+directory = /path/to/backups
+#   Skip backup of RRD data? Much smaller backups if
+#   you don't mind losing graph data on a restore.
+skiprrd = yes 
+#   Verify the SSL certificate on connection?
+verify_ssl = no
+
+[firewall01]
+# Uses all default options
+host = 172.19.231.254
+
+[firewall02]
+# Overrides all the default options
+host = firewall02.example.com
+skiprrd = no
+directory = /alt/backup/path
+username = different-admin
+password = some-different-pass
+verify_ssl = yes
+
+[firewall03]
+# Overrides only 'skiprrd'
+host = fw03.example.com
+skiprrd = no
+-------------------------------------------------------
+"""
+
+
+if __name__ == "__main__":
+    firewalls = parse_config()
+    for fw in firewalls:
+        backup_status = get_backup(fw)
+        print "{:20}: {}".format(fw, backup_status)
