@@ -153,8 +153,10 @@ Here is a short sample configuration:
 # no defaults are actually used.
 
 [defaults]
-username  = admin-user
-password  = your-admin-pass
+# Highly recommended to create a backup-only user and
+# _not_ store admin or even r/w credentials here.
+username  = backup-user
+password  = your-backup-pass
 #   Location where configs are written (no trailing /).
 directory = /path/to/backups
 #   Skip backup of RRD data? Much smaller backups if
@@ -172,7 +174,7 @@ host = 172.19.231.254
 host = firewall02.example.com
 skiprrd = no
 directory = /alt/backup/path
-username = different-admin
+username = different-user
 password = some-different-pass
 verify_ssl = yes
 

@@ -8,4 +8,10 @@ Simply requires:
   - BeautifulSoup4 (python-beautifulsoup4 on Fedora)
   - ConfigParser (python-configparser on Fedora)
 
-Bugfixes/improvements welcome, I'm still learning!
+As you're storing credentials in a .conf file, you should both limit permissions on the file itself
+and use a separate user for backups.  You can create a backup-only user from pfSense's User Manager with
+only two permissions set in the "Effective Privileges" section:
+  - WebCfg - Diagnostics: Backup/restore page
+  - User - Config - Deny Config Write
+
+Bugfixes/improvements welcome, I'm still learning.
