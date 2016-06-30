@@ -7,3 +7,5 @@ Simply requires:
   - requests (python-requests pkg on Fedora)
   - BeautifulSoup4 (python-beautifulsoup4 on Fedora)
   - ConfigParser (python-configparser on Fedora)
+
+Bugfixes/improvements welcome, I'm still learning!
