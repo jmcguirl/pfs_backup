@@ -63,4 +63,4 @@ only two permissions set in the "Effective Privileges" section:
   - WebCfg - Diagnostics: Backup/restore page
   - User - Config - Deny Config Write
 
-Bugfixes/improvements welcome, I'm still learning.
+Bugfixes/improvements welcome.

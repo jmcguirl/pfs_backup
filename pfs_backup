@@ -83,7 +83,7 @@ def get_backup(fwl):
         idx = disp.index('=') + 1
         config_name = disp[idx:]
 
-    confpath = firewalls[fwl]['directory'] + '/' + config_name
+    confpath = "{}/{}".format(firewalls[fwl]['directory'], config_name)
     try:
         conf = open(confpath, 'w')
     except IOError as err:
@@ -147,6 +147,9 @@ Here is a short sample configuration:
 # is required. You only need to specify the others if
 # you want to override defaults for that firewall.
 #
+# For hosts using ports other than 443, append the
+# port to the hostname/ip, e.g. "fw2:8443".
+#
 # You _must_ have 'username', 'password', 'skiprrd',
 # 'verify_ssl', and 'directory' in [defaults], even 
 # if intending to redefine them per-firewall and thus
@@ -171,7 +174,7 @@ host = 172.19.231.254
 
 [firewall02]
 # Overrides all the default options
-host = firewall02.example.com
+host = firewall02.example.com:7777
 skiprrd = no
 directory = /alt/backup/path
 username = different-user
